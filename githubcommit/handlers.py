@@ -18,6 +18,7 @@ class GitCommitHandler(IPythonHandler):
 
         # git parameters from environment variables
         # expand variables since Docker's will pass VAR=$VAL as $VAL without expansion
+        print("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'), os.path.expandvars(os.environ.get('GIT_REPO_NAME'))))
         git_dir = "{}/{}".format(os.path.expandvars(os.environ.get('GIT_PARENT_DIR')), os.path.expandvars(os.environ.get('GIT_REPO_NAME')))
         print("Git dir: {}".format(git_dir))
         git_url = os.path.expandvars(os.environ.get('GIT_REMOTE_URL'))
