@@ -12,12 +12,9 @@ def print_err(string):
 
 class GitCommitHandler(IPythonHandler):
 
-
     def error_and_return(self, dirname, reason):
-
         # send error
         self.send_error(500, reason=reason)
-
         # return to directory
         os.chdir(dirname)
 
@@ -26,8 +23,10 @@ class GitCommitHandler(IPythonHandler):
         try:
             # git parameters from environment variables
             # expand variables since Docker's will pass VAR=$VAL as $VAL without expansion
-            print_err("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'), os.path.expandvars(os.environ.get('GIT_REPO_NAME'))))
-            git_dir = "{}/{}".format(os.path.expandvars(os.environ.get('GIT_PARENT_DIR')), os.path.expandvars(os.environ.get('GIT_REPO_NAME')))
+            print_err("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'),
+                                              os.path.expandvars(os.environ.get('GIT_REPO_NAME'))))
+            git_dir = "{}/{}".format(os.path.expandvars(os.environ.get('GIT_PARENT_DIR')),
+                                     os.path.expandvars(os.environ.get('GIT_REPO_NAME')))
             print_err("Git dir: {}".format(git_dir))
             git_url = os.path.expandvars(os.environ.get('GIT_REMOTE_URL'))
             print_err("Remote url: {}".format(git_url))
@@ -58,7 +57,7 @@ class GitCommitHandler(IPythonHandler):
             # select branch within repo
             try:
                 os.chdir(git_dir)
-                dir_repo = check_output(['git','rev-parse','--show-toplevel']).strip()
+                dir_repo = check_output(['git', 'rev-parse', '--show-toplevel']).strip()
                 repo = Repo(dir_repo.decode('utf8'))
             except GitCommandError as e:
                 self.error_and_return(cwd, "Could not checkout repo: {}".format(dir_repo))
@@ -73,8 +72,9 @@ class GitCommitHandler(IPythonHandler):
             # commit current notebook
             # client will sent pathname containing git directory; append to git directory's parent
             try:
-                print_err(repo.git.add(str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)))
-                print_err(repo.git.commit( a=True, m="{}\n\nUpdated {}".format(msg, filename) ))
+                print_err(repo.git.add(
+                    str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)))
+                print_err(repo.git.commit(a=True, m="{}\n\nUpdated {}".format(msg, filename)))
             except GitCommandError as e:
                 print_err(e)
                 self.error_and_return(cwd, "Could not commit changes to notebook: {}".format(git_dir_parent + filename))
@@ -90,8 +90,9 @@ class GitCommitHandler(IPythonHandler):
             # push changes
             try:
                 pushed = remote.push(git_branch)
-                assert len(pushed)>0
-                assert pushed[0].flags in [git.remote.PushInfo.UP_TO_DATE, git.remote.PushInfo.FAST_FORWARD, git.remote.PushInfo.NEW_HEAD, git.remote.PushInfo.NEW_TAG]
+                assert len(pushed) > 0
+                assert pushed[0].flags in [git.remote.PushInfo.UP_TO_DATE, git.remote.PushInfo.FAST_FORWARD,
+                                           git.remote.PushInfo.NEW_HEAD, git.remote.PushInfo.NEW_TAG]
             except GitCommandError as e:
                 print_err(e)
                 self.error_and_return(cwd, "Could not push to remote {}".format(git_remote))
@@ -102,17 +103,17 @@ class GitCommitHandler(IPythonHandler):
 
             # open pull request
             try:
-              github_url = "https://api.github.com/repos/{}/pulls".format(git_repo_upstream)
-              github_pr = {
-                  "title":"{} Notebooks".format(git_user),
-                  "body":"IPython notebooks submitted by {}".format(git_user),
-                  "head":"{}:{}".format(git_user, git_remote),
-                  "base":"master"
-              }
-              github_headers = {"Authorization": "token {}".format(git_access_token)}
-              r = requests.post(github_url, data=json.dumps(github_pr), headers=github_headers)
-              if r.status_code != 201:
-                print_err("Error submitting Pull Request to {}".format(git_repo_upstream))
+                github_url = "https://api.github.com/repos/{}/pulls".format(git_repo_upstream)
+                github_pr = {
+                    "title": "{} Notebooks".format(git_user),
+                    "body": "IPython notebooks submitted by {}".format(git_user),
+                    "head": "{}:{}".format(git_user, git_remote),
+                    "base": "master"
+                }
+                github_headers = {"Authorization": "token {}".format(git_access_token)}
+                r = requests.post(github_url, data=json.dumps(github_pr), headers=github_headers)
+                if r.status_code != 201:
+                    print_err("Error submitting Pull Request to {}".format(git_repo_upstream))
             except:
                 print_err("Error submitting Pull Request to {}".format(git_repo_upstream))
 
@@ -120,7 +121,9 @@ class GitCommitHandler(IPythonHandler):
             os.chdir(cwd)
 
             # close connection
-            self.write({'status': 200, 'statusText': 'Success!  Changes to {} captured on branch {} at {}'.format(filename, git_branch, git_url)})
+            self.write({'status': 200,
+                        'statusText': 'Success!  Changes to {} captured on branch {} at {}'.format(filename, git_branch,
+                                                                                                   git_url)})
         except Exception as e:
             print_err(e)
             cwd = os.getcwd()
@@ -130,4 +133,3 @@ class GitCommitHandler(IPythonHandler):
 def setup_handlers(nbapp):
     route_pattern = ujoin(nbapp.settings['base_url'], '/git/commit')
     nbapp.add_handlers('.*', [(route_pattern, GitCommitHandler)])
-
