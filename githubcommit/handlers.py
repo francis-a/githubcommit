@@ -3,8 +3,12 @@ from notebook.base.handlers import IPythonHandler
 import os, json, git, urllib, requests
 from git import Repo, GitCommandError
 from subprocess import check_output
+from sys import stderr
 
 class GitCommitHandler(IPythonHandler):
+
+    def print_err(*args, **kwargs):
+        print(*args, file=stderr, **kwargs)
 
     def error_and_return(self, dirname, reason):
 
@@ -19,34 +23,34 @@ class GitCommitHandler(IPythonHandler):
         try:
             # git parameters from environment variables
             # expand variables since Docker's will pass VAR=$VAL as $VAL without expansion
-            print("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'), os.path.expandvars(os.environ.get('GIT_REPO_NAME'))))
+            print_err("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'), os.path.expandvars(os.environ.get('GIT_REPO_NAME'))))
             git_dir = "{}/{}".format(os.path.expandvars(os.environ.get('GIT_PARENT_DIR')), os.path.expandvars(os.environ.get('GIT_REPO_NAME')))
-            print("Git dir: {}".format(git_dir))
+            print_err("Git dir: {}".format(git_dir))
             git_url = os.path.expandvars(os.environ.get('GIT_REMOTE_URL'))
-            print("Remote url: {}".format(git_url))
+            print_err("Remote url: {}".format(git_url))
             git_user = os.path.expandvars(os.environ.get('GIT_USER'))
-            print("User: {}".format(git_user))
+            print_err("User: {}".format(git_user))
             git_repo_upstream = os.path.expandvars(os.environ.get('GIT_REMOTE_UPSTREAM'))
-            print("Repo upstream: {}".format(git_repo_upstream))
+            print_err("Repo upstream: {}".format(git_repo_upstream))
             git_branch = git_remote = os.path.expandvars(os.environ.get('GIT_BRANCH_NAME'))
-            print("Branch: {}".format(git_branch))
+            print_err("Branch: {}".format(git_branch))
             git_access_token = os.path.expandvars(os.environ.get('GITHUB_ACCESS_TOKEN'))
-            print("Token: {}".format(git_access_token))
+            print_err("Token: {}".format(git_access_token))
 
             # get the parent directory for git operations
             git_dir_parent = os.path.dirname(git_dir)
-            print("Parent dir {}".format(git_dir_parent))
+            print_err("Parent dir {}".format(git_dir_parent))
 
             # obtain filename and msg for commit
             data = json.loads(self.request.body.decode('utf-8'))
-            print("Loaded json: {}".format(data))
+            print_err("Loaded json: {}".format(data))
             filename = urllib.parse.unquote(data['filename'])
-            print("Filename: {}".format(filename))
+            print_err("Filename: {}".format(filename))
             msg = data['msg']
 
             # get current directory (to return later)
             cwd = os.getcwd()
-            print("working dir {}".format(cwd))
+            print_err("working dir {}".format(cwd))
 
             # select branch within repo
             try:
@@ -59,17 +63,17 @@ class GitCommitHandler(IPythonHandler):
 
             # create new branch
             try:
-                print(repo.git.checkout('HEAD', b=git_branch))
+                print_err(repo.git.checkout('HEAD', b=git_branch))
             except GitCommandError:
-                print("Switching to {}".format(repo.heads[git_branch].checkout()))
+                print_err("Switching to {}".format(repo.heads[git_branch].checkout()))
 
             # commit current notebook
             # client will sent pathname containing git directory; append to git directory's parent
             try:
-                print(repo.git.add(str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)))
-                print(repo.git.commit( a=True, m="{}\n\nUpdated {}".format(msg, filename) ))
+                print_err(repo.git.add(str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)))
+                print_err(repo.git.commit( a=True, m="{}\n\nUpdated {}".format(msg, filename) ))
             except GitCommandError as e:
-                print(e)
+                print_err(e)
                 self.error_and_return(cwd, "Could not commit changes to notebook: {}".format(git_dir_parent + filename))
                 return
 
@@ -77,7 +81,7 @@ class GitCommitHandler(IPythonHandler):
             try:
                 remote = repo.create_remote(git_remote, git_url)
             except GitCommandError:
-                print("Remote {} already exists...".format(git_remote))
+                print_err("Remote {} already exists...".format(git_remote))
                 remote = repo.remote(git_remote)
 
             # push changes
@@ -86,7 +90,7 @@ class GitCommitHandler(IPythonHandler):
                 assert len(pushed)>0
                 assert pushed[0].flags in [git.remote.PushInfo.UP_TO_DATE, git.remote.PushInfo.FAST_FORWARD, git.remote.PushInfo.NEW_HEAD, git.remote.PushInfo.NEW_TAG]
             except GitCommandError as e:
-                print(e)
+                print_err(e)
                 self.error_and_return(cwd, "Could not push to remote {}".format(git_remote))
                 return
             except AssertionError as e:
@@ -105,9 +109,9 @@ class GitCommitHandler(IPythonHandler):
               github_headers = {"Authorization": "token {}".format(git_access_token)}
               r = requests.post(github_url, data=json.dumps(github_pr), headers=github_headers)
               if r.status_code != 201:
-                print("Error submitting Pull Request to {}".format(git_repo_upstream))
+                print_err("Error submitting Pull Request to {}".format(git_repo_upstream))
             except:
-                print("Error submitting Pull Request to {}".format(git_repo_upstream))
+                print_err("Error submitting Pull Request to {}".format(git_repo_upstream))
 
             # return to directory
             os.chdir(cwd)
@@ -115,6 +119,7 @@ class GitCommitHandler(IPythonHandler):
             # close connection
             self.write({'status': 200, 'statusText': 'Success!  Changes to {} captured on branch {} at {}'.format(filename, git_branch, git_url)})
         except Exception as e:
+            print_err(e)
             cwd = os.getcwd()
             self.error_and_return(cwd, e)
 
