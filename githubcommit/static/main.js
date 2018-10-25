@@ -27,7 +27,7 @@ define(['base/js/namespace','base/js/dialog','jquery'],function(IPython, dialog,
                              'msg': input.val()
                            };
                 var settings = {
-                    url : '/git/commit',
+                    url : '/cloud-analytics/git/commit',
                     processData : false,
                     type : "PUT",
                     dataType: "json",
