@@ -5,10 +5,13 @@ from git import Repo, GitCommandError
 from subprocess import check_output
 from sys import stderr
 
+
+def print_err(string):
+    print(string, file=stderr)
+
+
 class GitCommitHandler(IPythonHandler):
 
-    def print_err(*args, **kwargs):
-        print(*args, file=stderr, **kwargs)
 
     def error_and_return(self, dirname, reason):
 
