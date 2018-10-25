@@ -19,22 +19,32 @@ class GitCommitHandler(IPythonHandler):
         # git parameters from environment variables
         # expand variables since Docker's will pass VAR=$VAL as $VAL without expansion
         git_dir = "{}/{}".format(os.path.expandvars(os.environ.get('GIT_PARENT_DIR')), os.path.expandvars(os.environ.get('GIT_REPO_NAME')))
+        print("Git dir: {}".format(git_dir))
         git_url = os.path.expandvars(os.environ.get('GIT_REMOTE_URL'))
+        print("Remote url: {}".format(git_url))
         git_user = os.path.expandvars(os.environ.get('GIT_USER'))
+        print("User: {}".format(git_user))
         git_repo_upstream = os.path.expandvars(os.environ.get('GIT_REMOTE_UPSTREAM'))
+        print("Repo upstream: {}".format(git_repo_upstream))
         git_branch = git_remote = os.path.expandvars(os.environ.get('GIT_BRANCH_NAME'))
+        print("Branch: {}".format(git_branch))
         git_access_token = os.path.expandvars(os.environ.get('GITHUB_ACCESS_TOKEN'))
+        print("Token: {}".format(git_access_token))
 
         # get the parent directory for git operations
         git_dir_parent = os.path.dirname(git_dir)
+        print("Parent dir {}".format(git_dir_parent))
 
         # obtain filename and msg for commit
         data = json.loads(self.request.body.decode('utf-8'))
+        print("Loaded json: {}".format(data))
         filename = urllib.parse.unquote(data['filename'])
+        print("Filename: {}".format(filename))
         msg = data['msg']
 
         # get current directory (to return later)
         cwd = os.getcwd()
+        print("working dir {}".format(cwd))
 
         # select branch within repo
         try:
