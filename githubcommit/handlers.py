@@ -16,103 +16,107 @@ class GitCommitHandler(IPythonHandler):
 
     def put(self):
 
-        # git parameters from environment variables
-        # expand variables since Docker's will pass VAR=$VAL as $VAL without expansion
-        print("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'), os.path.expandvars(os.environ.get('GIT_REPO_NAME'))))
-        git_dir = "{}/{}".format(os.path.expandvars(os.environ.get('GIT_PARENT_DIR')), os.path.expandvars(os.environ.get('GIT_REPO_NAME')))
-        print("Git dir: {}".format(git_dir))
-        git_url = os.path.expandvars(os.environ.get('GIT_REMOTE_URL'))
-        print("Remote url: {}".format(git_url))
-        git_user = os.path.expandvars(os.environ.get('GIT_USER'))
-        print("User: {}".format(git_user))
-        git_repo_upstream = os.path.expandvars(os.environ.get('GIT_REMOTE_UPSTREAM'))
-        print("Repo upstream: {}".format(git_repo_upstream))
-        git_branch = git_remote = os.path.expandvars(os.environ.get('GIT_BRANCH_NAME'))
-        print("Branch: {}".format(git_branch))
-        git_access_token = os.path.expandvars(os.environ.get('GITHUB_ACCESS_TOKEN'))
-        print("Token: {}".format(git_access_token))
-
-        # get the parent directory for git operations
-        git_dir_parent = os.path.dirname(git_dir)
-        print("Parent dir {}".format(git_dir_parent))
-
-        # obtain filename and msg for commit
-        data = json.loads(self.request.body.decode('utf-8'))
-        print("Loaded json: {}".format(data))
-        filename = urllib.parse.unquote(data['filename'])
-        print("Filename: {}".format(filename))
-        msg = data['msg']
-
-        # get current directory (to return later)
-        cwd = os.getcwd()
-        print("working dir {}".format(cwd))
-
-        # select branch within repo
         try:
-            os.chdir(git_dir)
-            dir_repo = check_output(['git','rev-parse','--show-toplevel']).strip()
-            repo = Repo(dir_repo.decode('utf8'))
-        except GitCommandError as e:
-            self.error_and_return(cwd, "Could not checkout repo: {}".format(dir_repo))
-            return
+            # git parameters from environment variables
+            # expand variables since Docker's will pass VAR=$VAL as $VAL without expansion
+            print("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'), os.path.expandvars(os.environ.get('GIT_REPO_NAME'))))
+            git_dir = "{}/{}".format(os.path.expandvars(os.environ.get('GIT_PARENT_DIR')), os.path.expandvars(os.environ.get('GIT_REPO_NAME')))
+            print("Git dir: {}".format(git_dir))
+            git_url = os.path.expandvars(os.environ.get('GIT_REMOTE_URL'))
+            print("Remote url: {}".format(git_url))
+            git_user = os.path.expandvars(os.environ.get('GIT_USER'))
+            print("User: {}".format(git_user))
+            git_repo_upstream = os.path.expandvars(os.environ.get('GIT_REMOTE_UPSTREAM'))
+            print("Repo upstream: {}".format(git_repo_upstream))
+            git_branch = git_remote = os.path.expandvars(os.environ.get('GIT_BRANCH_NAME'))
+            print("Branch: {}".format(git_branch))
+            git_access_token = os.path.expandvars(os.environ.get('GITHUB_ACCESS_TOKEN'))
+            print("Token: {}".format(git_access_token))
 
-        # create new branch
-        try:
-            print(repo.git.checkout('HEAD', b=git_branch))
-        except GitCommandError:
-            print("Switching to {}".format(repo.heads[git_branch].checkout()))
+            # get the parent directory for git operations
+            git_dir_parent = os.path.dirname(git_dir)
+            print("Parent dir {}".format(git_dir_parent))
 
-        # commit current notebook
-        # client will sent pathname containing git directory; append to git directory's parent
-        try:
-            print(repo.git.add(str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)))
-            print(repo.git.commit( a=True, m="{}\n\nUpdated {}".format(msg, filename) ))
-        except GitCommandError as e:
-            print(e)
-            self.error_and_return(cwd, "Could not commit changes to notebook: {}".format(git_dir_parent + filename))
-            return
+            # obtain filename and msg for commit
+            data = json.loads(self.request.body.decode('utf-8'))
+            print("Loaded json: {}".format(data))
+            filename = urllib.parse.unquote(data['filename'])
+            print("Filename: {}".format(filename))
+            msg = data['msg']
 
-        # create or switch to remote
-        try:
-            remote = repo.create_remote(git_remote, git_url)
-        except GitCommandError:
-            print("Remote {} already exists...".format(git_remote))
-            remote = repo.remote(git_remote)
+            # get current directory (to return later)
+            cwd = os.getcwd()
+            print("working dir {}".format(cwd))
 
-        # push changes
-        try:
-            pushed = remote.push(git_branch)
-            assert len(pushed)>0
-            assert pushed[0].flags in [git.remote.PushInfo.UP_TO_DATE, git.remote.PushInfo.FAST_FORWARD, git.remote.PushInfo.NEW_HEAD, git.remote.PushInfo.NEW_TAG]
-        except GitCommandError as e:
-            print(e)
-            self.error_and_return(cwd, "Could not push to remote {}".format(git_remote))
-            return
-        except AssertionError as e:
-            self.error_and_return(cwd, "Could not push to remote {}: {}".format(git_remote, pushed[0].summary))
-            return
+            # select branch within repo
+            try:
+                os.chdir(git_dir)
+                dir_repo = check_output(['git','rev-parse','--show-toplevel']).strip()
+                repo = Repo(dir_repo.decode('utf8'))
+            except GitCommandError as e:
+                self.error_and_return(cwd, "Could not checkout repo: {}".format(dir_repo))
+                return
 
-        # open pull request
-        try:
-          github_url = "https://api.github.com/repos/{}/pulls".format(git_repo_upstream)
-          github_pr = {
-              "title":"{} Notebooks".format(git_user),
-              "body":"IPython notebooks submitted by {}".format(git_user),
-              "head":"{}:{}".format(git_user, git_remote),
-              "base":"master"
-          }
-          github_headers = {"Authorization": "token {}".format(git_access_token)}
-          r = requests.post(github_url, data=json.dumps(github_pr), headers=github_headers)
-          if r.status_code != 201:
-            print("Error submitting Pull Request to {}".format(git_repo_upstream))
-        except:
-            print("Error submitting Pull Request to {}".format(git_repo_upstream))
+            # create new branch
+            try:
+                print(repo.git.checkout('HEAD', b=git_branch))
+            except GitCommandError:
+                print("Switching to {}".format(repo.heads[git_branch].checkout()))
 
-        # return to directory
-        os.chdir(cwd)
+            # commit current notebook
+            # client will sent pathname containing git directory; append to git directory's parent
+            try:
+                print(repo.git.add(str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)))
+                print(repo.git.commit( a=True, m="{}\n\nUpdated {}".format(msg, filename) ))
+            except GitCommandError as e:
+                print(e)
+                self.error_and_return(cwd, "Could not commit changes to notebook: {}".format(git_dir_parent + filename))
+                return
 
-        # close connection
-        self.write({'status': 200, 'statusText': 'Success!  Changes to {} captured on branch {} at {}'.format(filename, git_branch, git_url)})
+            # create or switch to remote
+            try:
+                remote = repo.create_remote(git_remote, git_url)
+            except GitCommandError:
+                print("Remote {} already exists...".format(git_remote))
+                remote = repo.remote(git_remote)
+
+            # push changes
+            try:
+                pushed = remote.push(git_branch)
+                assert len(pushed)>0
+                assert pushed[0].flags in [git.remote.PushInfo.UP_TO_DATE, git.remote.PushInfo.FAST_FORWARD, git.remote.PushInfo.NEW_HEAD, git.remote.PushInfo.NEW_TAG]
+            except GitCommandError as e:
+                print(e)
+                self.error_and_return(cwd, "Could not push to remote {}".format(git_remote))
+                return
+            except AssertionError as e:
+                self.error_and_return(cwd, "Could not push to remote {}: {}".format(git_remote, pushed[0].summary))
+                return
+
+            # open pull request
+            try:
+              github_url = "https://api.github.com/repos/{}/pulls".format(git_repo_upstream)
+              github_pr = {
+                  "title":"{} Notebooks".format(git_user),
+                  "body":"IPython notebooks submitted by {}".format(git_user),
+                  "head":"{}:{}".format(git_user, git_remote),
+                  "base":"master"
+              }
+              github_headers = {"Authorization": "token {}".format(git_access_token)}
+              r = requests.post(github_url, data=json.dumps(github_pr), headers=github_headers)
+              if r.status_code != 201:
+                print("Error submitting Pull Request to {}".format(git_repo_upstream))
+            except:
+                print("Error submitting Pull Request to {}".format(git_repo_upstream))
+
+            # return to directory
+            os.chdir(cwd)
+
+            # close connection
+            self.write({'status': 200, 'statusText': 'Success!  Changes to {} captured on branch {} at {}'.format(filename, git_branch, git_url)})
+        except Exception as e:
+            cwd = os.getcwd()
+            self.error_and_return(cwd, e)
 
 
 def setup_handlers(nbapp):
