@@ -94,7 +94,7 @@ class GitCommitHandler(IPythonHandler):
         # open pull request
         try:
           github_url = "https://api.github.com/repos/{}/pulls".format(git_repo_upstream)
-          github_pr = {9
+          github_pr = {
               "title":"{} Notebooks".format(git_user),
               "body":"IPython notebooks submitted by {}".format(git_user),
               "head":"{}:{}".format(git_user, git_remote),
