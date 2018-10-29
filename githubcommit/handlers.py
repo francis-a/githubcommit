@@ -97,6 +97,7 @@ class GitCommitHandler(IPythonHandler):
 
             # push changes
             try:
+                remote.pull()
                 pushed = remote.push(git_branch)
                 assert len(pushed) > 0
                 assert pushed[0].flags in [git.remote.PushInfo.UP_TO_DATE, git.remote.PushInfo.FAST_FORWARD,
