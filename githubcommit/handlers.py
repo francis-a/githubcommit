@@ -78,6 +78,8 @@ class GitCommitHandler(IPythonHandler):
             # commit current notebook
             # client will sent pathname containing git directory; append to git directory's parent
             try:
+                command = str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)
+                print_err("Will add {}".format(command))
                 print_err(repo.git.add(
                     str(os.environ.get('GIT_PARENT_DIR') + "/" + os.environ.get('GIT_REPO_NAME') + filename)))
                 print_err(repo.git.commit(a=True, m="{}\n\nUpdated {}".format(msg, filename)))
