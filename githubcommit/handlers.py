@@ -4,10 +4,15 @@ import os, json, git, urllib, requests
 from git import Repo, GitCommandError
 from subprocess import check_output
 from sys import stderr
+import pwd
 
 
 def print_err(string):
     print(string, file=stderr)
+
+
+def get_username():
+    return pwd.getpwuid(os.getuid())[0]
 
 
 class GitCommitHandler(IPythonHandler):
@@ -21,6 +26,7 @@ class GitCommitHandler(IPythonHandler):
     def put(self):
 
         try:
+            print_err("Running as user {}".format(get_username()))
             # git parameters from environment variables
             # expand variables since Docker's will pass VAR=$VAL as $VAL without expansion
             print_err("Pre dir {}, {}".format(os.environ.get('GIT_PARENT_DIR'),
