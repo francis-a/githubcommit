@@ -91,10 +91,18 @@ class GitCommitHandler(IPythonHandler):
             # create or switch to remote
             try:
                 remote = repo.create_remote(git_remote, git_url)
-                print_err(remote.pull())
             except GitCommandError:
                 print_err("Remote {} already exists...".format(git_remote))
                 remote = repo.remote(git_remote)
+
+            # pull changes
+            try:
+                print_err("Will pull")
+                o = repo.remotes.origin
+                o.pull()
+                print_err("Did pull")
+            except Exception as e:
+                print_err("Error during pull {}".format(e))
 
             # push changes
             try:
